@@ -6,7 +6,7 @@ from npu_monkey_patch.utils import index_first_axis, pad_input, unpad_input
 import transformers
 from transformers.cache_utils import Cache
 from transformers.utils import is_flash_attn_greater_or_equal_2_10, logging
-from transformers.models.idefics2.modeling_idefics2 import Idefics2VisionAttention, _get_unpad_data
+from transformers.models.idefics2.modeling_idefics2 import Idefics2VisionAttention, _get_unpad_data, IDEFICS_VISION_ATTENTION_CLASSES
 
 logger = logging.get_logger(__name__)
 
@@ -48,6 +48,9 @@ class NpuIdefics2VisionFlashAttention2(Idefics2VisionAttention):
         # Flash attention requires the input to have the shape
         # batch_size x seq_length x head_dim x hidden_dim
         # therefore we just need to keep the original shape
+        # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        # key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        # value_states = value_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim)
         key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim)
         value_states = value_states.view(bsz, q_len, self.num_heads, self.head_dim)
@@ -55,6 +58,12 @@ class NpuIdefics2VisionFlashAttention2(Idefics2VisionAttention):
         kv_seq_len = key_states.shape[1]
         if past_key_value is not None:
             kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+        # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
+        # to be able to avoid many of these transpose/reshape/view.
+        # query_states = query_states.transpose(1, 2)
+        # key_states = key_states.transpose(1, 2)
+        # value_states = value_states.transpose(1, 2)
 
         dropout_rate = self.dropout if self.training else 0.0
 
@@ -206,4 +215,5 @@ class NpuIdefics2VisionFlashAttention2(Idefics2VisionAttention):
 
 
 def replace_with_torch_npu_idefics2_flash_attention():
-    transformers.models.idefics2.modeling_idefics2.Idefics2VisionFlashAttention2 = NpuIdefics2VisionFlashAttention2
+    IDEFICS_VISION_ATTENTION_CLASSES['flash_attention_2'] = NpuIdefics2VisionFlashAttention2
+    
