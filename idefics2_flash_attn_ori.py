@@ -5,8 +5,10 @@ import torch_npu
 from npu_monkey_patch.utils import index_first_axis, pad_input, unpad_input
 import transformers
 from transformers.cache_utils import Cache
-from transformers.utils import is_flash_attn_greater_or_equal_2_10, logging
+from transformers.utils import is_flash_attn_greater_or_equal_2_10, logging, is_flash_attn_2_available
 from transformers.models.idefics2.modeling_idefics2 import Idefics2VisionAttention, _get_unpad_data
+if is_flash_attn_2_available():
+    from flash_attn import flash_attn_func, flash_attn_varlen_func
 
 logger = logging.get_logger(__name__)
 
