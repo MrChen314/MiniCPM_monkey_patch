@@ -3,7 +3,6 @@ import warnings
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint
-import torch_npu
 import transformers
 from transformers.cache_utils import Cache
 from .utils import index_first_axis, pad_input, unpad_input
